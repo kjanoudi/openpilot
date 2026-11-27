@@ -6,6 +6,19 @@ Catalog behavior versions describe model inputs and outputs. The artifact ABI an
 
 `modeld` records the loaded artifact digest, process identity, variant, and fallback reason in a bounded volatile receipt. Status requires a matching running process and fresh valid model outputs before reporting an active model. A failed Chestnut load falls back to the initialized small runner. Artifact integrity and bench inference do not establish on-road driving quality.
 
+## Telluride HDA II comparison profile
+
+For the 2023 Telluride HDA II comparison on comma 3X, use the standard Small
+artifact on StarPilot revision `a36e7b53642221c669bf75ed7254d48e8b053c8b`.
+In Model Manager, download **Down To Ride v6** (`dtr6223`), turn off Model
+Randomizer, and select it as the Small model. Leave the Big selection empty.
+The v26 catalog SHA-256 is
+`af8417340b6f3b70cd0117709af09e85a75b33aee9a66decd69e05936ca48872`.
+
+The selection applies when modeld next starts. Check the active model after
+startup. To reproduce the previous configuration, select Cheddar as the Small
+model and re-enable Model Randomizer with the original exclusion list.
+
 ## Model Laboratory
 
 Laboratory artifact management uses separate AMD variants of small models. A standard on-device artifact or a Chestnut-class large model cannot substitute for one. The manifest declares each variant under `accelerator_artifacts.amd`, with `execution_device: "AMD"`, the current `compiler_revision`, and the same artifact format, digest, size, and chunk-count fields as ordinary catalog artifacts. Files are named `<id>_driving_amd_tinygrad.pkl` under the model's existing catalog directory. Deleting an AMD variant preserves the ordinary on-device model.
