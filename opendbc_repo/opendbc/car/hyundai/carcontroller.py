@@ -1,3 +1,5 @@
+from copy import copy
+
 from opendbc.car.hyundai.ioniq5pe_long_profile import qualified as pe_long_qualified
 from opendbc.car.hyundai.ioniq5pe_longitudinal import PELongitudinalPolicy
 from opendbc.car.hyundai import ioniq5pe_long_sender
@@ -116,6 +118,12 @@ class CarController(CarControllerBase):
     self.gv60_longitudinal = gv60_long_qualified(CP)
     self.CAN = CanBus(CP)
     self.params = CarControllerParams(CP)
+    self.stock_hda2_rate_trial = None
+    if (is_blended(CP) and CP.flags & HyundaiFlags.CANFD_LKA_STEER_MSG and
+        CP.pcmCruise and not CP.openpilotLongitudinalControl):
+      self.stock_hda2_rate_trial = copy(self.params)
+      self.stock_hda2_rate_trial.STEER_DELTA_UP = 2
+      self.stock_hda2_rate_trial.STEER_DELTA_DOWN = 3
     self.packer = CANPacker(dbc_names[Bus.pt])
     self.legacy_fca11 = hyundaican.uses_legacy_fca11(CP)
     self.angle_limit_counter = 0
@@ -222,6 +230,12 @@ class CarController(CarControllerBase):
     new_torque = int(round(actuators.torque * self.params.STEER_MAX))
     if _projection is not None:
       _projection.input(new_torque, self.params.STEER_MAX, self.apply_torque_last, CS.out.steeringTorque, self.params, limiter='driver')
+    if (self.stock_hda2_rate_trial is not None and CC.latActive and CS.out.canValid and not CS.out.canTimeout and
+        not CS.out.steeringPressed and not CS.out.steeringDisengage and not CS.out.steerFaultTemporary and
+        not CS.out.steerFaultPermanent):
+      new_torque = apply_driver_steer_torque_limits(new_torque, self.apply_torque_last, CS.out.steeringTorque,
+                                                    self.stock_hda2_rate_trial)
+    # The baseline limiter can require faster release when driver torque tightens the allowed range.
     apply_torque = (0 if self.angle_vm is not None else
                     apply_driver_steer_torque_limits(new_torque, self.apply_torque_last, CS.out.steeringTorque, self.params))
 

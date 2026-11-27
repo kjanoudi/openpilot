@@ -101,7 +101,7 @@ class TestPalisade2023(unittest.TestCase):
       previous = 0
       for tick in range(20):
         actuators, messages = ci.apply(command.as_reader(), 1_200_000_000 + tick * 10_000_000)
-        self.assertEqual(actuators.torqueOutputCan - previous, 3 if topology == 'hdaii' else 2)
+        self.assertEqual(actuators.torqueOutputCan - previous, 2)
         previous = actuators.torqueOutputCan
         addresses = {a for a, _, _ in messages}
         self.assertFalse(addresses & {0x420, 0x421, 0x389, 0x7D0, 0x730})
@@ -122,6 +122,28 @@ class TestPalisade2023(unittest.TestCase):
       command.latActive = False
       actuators, _ = ci.apply(command.as_reader(), 1_500_000_000)
       self.assertEqual(actuators.torqueOutputCan, 0)
+
+  def test_hda2_trial_preserves_driver_torque_unwind(self):
+    from opendbc.safety.tests.libsafety import libsafety_py
+
+    safety = libsafety_py.libsafety
+    command = structs.CarControl(latActive=True)
+    for sign in (-1, 1):
+      for driver_torque, pressed, expected in ((0, False, 97), (0, True, 93), (-250, False, 93)):
+        with self.subTest(sign=sign, driver_torque=driver_torque, pressed=pressed):
+          ci = CarInterface(params('hdaii'))
+          ci.CC.apply_torque_last = sign * 100
+          ci.CS.out = structs.CarState(canValid=True, steeringTorque=sign * driver_torque, steeringPressed=pressed)
+          actuators, messages = ci.apply(command.as_reader(), 1_200_000_000)
+          self.assertEqual(actuators.torqueOutputCan, sign * expected)
+          self.assertEqual(safety.set_safety_hooks(structs.CarParams.SafetyModel.hyundai, 0x2010), 0)
+          safety.init_tests()
+          safety.set_controls_allowed(True)
+          safety.set_desired_torque_last(sign * 100)
+          safety.set_rt_torque_last(sign * 100)
+          safety.set_torque_driver(sign * driver_torque, sign * driver_torque)
+          address, data, bus = next(message for message in messages if message[0] == 0x50)
+          self.assertTrue(safety.safety_tx_hook(libsafety_py.make_CANPacket(address, bus, data)))
 
   def test_cancel_resume_route_to_exact_pt_bus_and_sibling_params_unchanged(self):
     for topology in ('hdai', 'hdaii'):
