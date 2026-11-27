@@ -33,6 +33,14 @@ DESCRIPTIONS = {
     "Enabling Experimental mode is recommended when enabling openpilot longitudinal control alpha. " +
     "Changing this setting will restart openpilot if the car is powered on."
   ),
+  'disable_forced': tr_noop(
+    "Driver monitoring still shows its warnings, but it will not force deceleration or escalate to the car " +
+    "when the driver stays unresponsive. Applies after openpilot restarts."
+  ),
+  'disable_timeout': tr_noop(
+    "Removes the driver monitoring lockout that blocks engagement for 1 to 30 minutes after repeated " +
+    "distraction alerts. Applies after openpilot restarts."
+  ),
   'cellular_disabled': tr_noop(
     "Hang up cellular data and don't redial. The modem stays registered and the SIM is untouched. " +
     "Remote access over cellular data is unavailable while this is enabled."
@@ -99,6 +107,22 @@ class DeveloperLayout(Widget):
       initial_state=self._params.get_bool(HOLD_KEY), callback=self._on_always_hold, enabled=ui_state.is_offroad,
     )
 
+    self._disable_forced_toggle = toggle_item(
+      lambda: tr("Disable Forced Disengagement"),
+      description=lambda: tr(DESCRIPTIONS['disable_forced']),
+      initial_state=self._params.get_bool("DisableDMForcedDisengage"),
+      callback=self._on_disable_forced,
+      enabled=ui_state.is_offroad,
+    )
+
+    self._disable_timeout_toggle = toggle_item(
+      lambda: tr("Disable Driver Monitoring Timeout"),
+      description=lambda: tr(DESCRIPTIONS['disable_timeout']),
+      initial_state=self._params.get_bool("DisableDMTimeout"),
+      callback=self._on_disable_timeout,
+      enabled=ui_state.is_offroad,
+    )
+
     self._ui_debug_toggle = toggle_item(
       lambda: tr("UI Debug Mode"),
       description="",
@@ -125,6 +149,8 @@ class DeveloperLayout(Widget):
       self._lat_maneuver_toggle,
       self._alpha_long_toggle,
       self._always_hold_toggle,
+      self._disable_forced_toggle,
+      self._disable_timeout_toggle,
       self._ui_debug_toggle,
       self._cellular_disabled_toggle,
     ], line_separator=True, spacing=0)
@@ -175,6 +201,8 @@ class DeveloperLayout(Widget):
       ("LateralManeuverMode", self._lat_maneuver_toggle),
       ("AlphaLongitudinalEnabled", self._alpha_long_toggle),
       (HOLD_KEY, self._always_hold_toggle),
+      ("DisableDMForcedDisengage", self._disable_forced_toggle),
+      ("DisableDMTimeout", self._disable_timeout_toggle),
       ("ShowDebugInfo", self._ui_debug_toggle),
       ("CellularDisabled", self._cellular_disabled_toggle),
     ):
@@ -186,6 +214,12 @@ class DeveloperLayout(Widget):
     if ui_state.is_offroad():
       self._params.put_bool(HOLD_KEY, state, block=True)
     self._always_hold_toggle.action_item.set_state(self._params.get_bool(HOLD_KEY))
+
+  def _on_disable_forced(self, state: bool):
+    self._params.put_bool("DisableDMForcedDisengage", state, block=True)
+
+  def _on_disable_timeout(self, state: bool):
+    self._params.put_bool("DisableDMTimeout", state, block=True)
 
   def _on_enable_ui_debug(self, state: bool):
     self._params.put_bool("ShowDebugInfo", state, block=True)

@@ -258,6 +258,8 @@ class SelfdriveD:
     self.personality = self.params.get("LongitudinalPersonality", return_default=True)
     self.recalibrating_seen = False
     self.dm_lockout_set = False
+    self.dm_timeout_disabled = self.params.get_bool("DisableDMTimeout")
+    self.dm_forced_disengage_disabled = self.params.get_bool("DisableDMForcedDisengage")
     self.dm_uncertain_alerted = False
     self.state_machine = StateMachine()
     self.legacy_2025_green_wheel_active = False
@@ -466,14 +468,15 @@ class SelfdriveD:
     # Handle DM
     if not self.CP.notCar:
       # Block engaging until lockout times out or ignition reset
-      if self.sm['driverMonitoringState'].lockout and not self.dm_lockout_set:
+      lockout = self.sm['driverMonitoringState'].lockout and not getattr(self, 'dm_timeout_disabled', False)
+      if lockout and not self.dm_lockout_set:
         self.params.put_bool("DriverTooDistracted", True)
         self.dm_lockout_set = True
-      elif not self.sm['driverMonitoringState'].lockout and self.dm_lockout_set:
+      elif not lockout and self.dm_lockout_set:
         self.params.remove("DriverTooDistracted")
         self.dm_lockout_set = False
       # No entry conditions
-      if self.sm['driverMonitoringState'].lockout or self.sm['driverMonitoringState'].alwaysOnLockout:
+      if lockout or self.sm['driverMonitoringState'].alwaysOnLockout:
         self.events.add(EventName.tooDistracted)
       # Alerts
       vision_dm = self.sm['driverMonitoringState'].activePolicy == MonitoringPolicy.vision
@@ -2001,9 +2004,10 @@ class SelfdriveD:
                              volkswagen_below_engage_lateral_allowed(self.CP, CS, intent)),
       immediate_disable=lateral_immediate_disable(self.CP, CS, intent, self.events.to_msg()),
       dm_lockout=bool(not self.sm.all_checks(['driverMonitoringState']) or
-                      not retained_dm_lateral and (self.sm['driverMonitoringState'].lockout or
+                      not retained_dm_lateral and ((self.sm['driverMonitoringState'].lockout and not getattr(self, 'dm_timeout_disabled', False)) or
                         self.sm['driverMonitoringState'].alwaysOnLockout or
-                        self.sm['driverMonitoringState'].alertLevel == AlertLevel.three)),
+                        (self.sm['driverMonitoringState'].alertLevel == AlertLevel.three and
+                         not getattr(self, 'dm_forced_disengage_disabled', False)))),
       pause_brake_mps=pause_brake_mps,
       gear_pause=reverse_pause,
       lateral_inhibit=self.aol_dm_lateral_inhibit or sng_standstill_lateral_inhibit(

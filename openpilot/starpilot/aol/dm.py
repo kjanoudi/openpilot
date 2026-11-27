@@ -50,7 +50,9 @@ def observe_owner(self, intent, previous_intent):
     self.aol_dm_retained_owner = None
   elif self.aol_axis_decision.lateral_active and previous_intent.allowedLatch:
     self.aol_dm_retained_owner = (intent.producerSessionId, self.aol_session_id)
-  if (self.sm['driverMonitoringState'].alertLevel == AlertLevel.three or
+  forced_alert = (self.sm['driverMonitoringState'].alertLevel == AlertLevel.three and
+                  not getattr(self, 'dm_forced_disengage_disabled', False))
+  if (forced_alert or
       self.sm['driverMonitoringState'].lockout or self.sm['driverMonitoringState'].alwaysOnLockout):
     self.aol_availability_long_inhibit = True
     self.aol_dm_lateral_inhibit = False

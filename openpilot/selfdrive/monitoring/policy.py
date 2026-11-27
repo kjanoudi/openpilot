@@ -129,7 +129,8 @@ def face_orientation_from_model(orient_model, pos_model, rpy_calib):
 
 
 class DriverMonitoring:
-  def __init__(self, rhd_saved=False, settings=None, always_on=False, allow_manumatic=False):
+  def __init__(self, rhd_saved=False, settings=None, always_on=False, allow_manumatic=False,
+               disable_forced_disengage=False, disable_timeout=False):
     # init policy settings
     self.settings = settings if settings is not None else DRIVER_MONITOR_SETTINGS()
 
@@ -144,6 +145,8 @@ class DriverMonitoring:
     self.alert_level = AlertLevel.none
     self.always_on = always_on
     self.allow_manumatic = allow_manumatic
+    self.disable_forced_disengage = disable_forced_disengage
+    self.disable_timeout = disable_timeout
     self.distracted_types = defaultdict(bool)
     self.driver_distracted = False
     self.driver_distraction_filter = FirstOrderFilter(0., self.settings._DISTRACTED_FILTER_TS, DT_DMON)
@@ -155,7 +158,7 @@ class DriverMonitoring:
     self.cnt_since_alert_3 = 0
     self.no_response_timeout = int(self.settings._NO_RESPONSE_TIMEOUT / DT_DMON)
     self.no_response_cnt = 0
-    self.lockout_active = Params().get_bool("DriverTooDistracted")
+    self.lockout_active = Params().get_bool("DriverTooDistracted") and not disable_timeout
     self.lockout_count = Params().get("DriverLockoutCount") or 0
     self.lockout_duration = self.settings._LOCKOUT_TIMES[min(max(self.lockout_count - 1, 0), len(self.settings._LOCKOUT_TIMES) - 1)]
     self.lockout_time_elapsed = 0
@@ -316,7 +319,8 @@ class DriverMonitoring:
     self.alert_level = AlertLevel.none
     self.driver_interacting = driver_engaged
 
-    if self.alert_3_cnt >= self.settings._MAX_ALERT_3 or self.no_response_cnt >= self.settings._MAX_NO_RESPONSE:
+    alert_3_exhausted = self.alert_3_cnt >= self.settings._MAX_ALERT_3 or self.no_response_cnt >= self.settings._MAX_NO_RESPONSE
+    if alert_3_exhausted and not self.disable_timeout:
       if not self.lockout_active:
         self.lockout_count += 1
         self.lockout_duration = self.settings._LOCKOUT_TIMES[min(self.lockout_count - 1, len(self.settings._LOCKOUT_TIMES) - 1)]
@@ -390,13 +394,15 @@ class DriverMonitoring:
     dat = messaging.new_message('driverMonitoringState', valid=valid)
     dm = dat.driverMonitoringState
 
-    dm.lockout = self.lockout_active
+    dm.lockout = self.lockout_active and not self.disable_timeout
     dm.lockoutCount = self.lockout_count
     if self.lockout_active:
       dm.lockoutMinutesRemaining = max(1, round((self.lockout_duration - self.lockout_time_elapsed) * DT_DMON / 60.))
-    dm.alert3Count = self.alert_3_cnt
-    dm.noResponseCount = self.no_response_cnt
-    dm.noResponseForceDecel = self.alert_level == AlertLevel.three and self.cnt_since_alert_3 >= self.no_response_timeout
+    # capnp Int8 fields; the counters are never reset while the timeout is disabled
+    dm.alert3Count = min(self.alert_3_cnt, 127)
+    dm.noResponseCount = min(self.no_response_cnt, 127)
+    dm.noResponseForceDecel = (not self.disable_forced_disengage and self.alert_level == AlertLevel.three and
+                               self.cnt_since_alert_3 >= self.no_response_timeout)
     dm.alwaysOn = self.always_on
     dm.alwaysOnLockout = self.always_on and self.awareness <= self.threshold_alert_2
     dm.alertLevel = self.alert_level

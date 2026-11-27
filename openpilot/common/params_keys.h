@@ -342,6 +342,8 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"DeveloperSidebar", {PERSISTENT, BOOL, "0"}},
     {"ShowBrakeStatus", {PERSISTENT, BOOL, "0"}},
     {"HideDMIcon", {PERSISTENT, BOOL, "0"}},
+    {"DisableDMForcedDisengage", {PERSISTENT, BOOL}},
+    {"DisableDMTimeout", {PERSISTENT, BOOL}},
     {"HidePersonalityAlerts", {PERSISTENT, BOOL, "0"}},
     {"ShowSpeedLimits", {PERSISTENT, BOOL, "1"}},
     {"SLCOnEngage", {PERSISTENT, BOOL, "0"}},

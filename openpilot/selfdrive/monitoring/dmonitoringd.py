@@ -33,7 +33,9 @@ def dmonitoringd_thread():
   allow_manumatic = _read_allow_manumatic(params)
   cp_checked = allow_manumatic is not None
   DM = DriverMonitoring(rhd_saved=params.get_bool("IsRhdDetected"), always_on=params.get_bool("AlwaysOnDM"),
-                        allow_manumatic=bool(allow_manumatic))
+                        allow_manumatic=bool(allow_manumatic),
+                        disable_forced_disengage=params.get_bool("DisableDMForcedDisengage"),
+                        disable_timeout=params.get_bool("DisableDMTimeout"))
   demo_mode=False
 
   # 20Hz <- dmonitoringmodeld

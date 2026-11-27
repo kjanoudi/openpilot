@@ -1,5 +1,6 @@
 from openpilot.common.test import OpenpilotTestCase
 from openpilot.cereal import log
+from openpilot.common.params import Params
 from openpilot.common.realtime import DT_DMON
 from openpilot.selfdrive.monitoring.policy import DriverMonitoring, DRIVER_MONITOR_SETTINGS
 from opendbc.car.structs import car
@@ -114,6 +115,38 @@ class TestMonitoring(OpenpilotTestCase):
     assert d_status.active_policy == log.DriverMonitoringState.MonitoringPolicy.wheeltouch
     assert d_status.lockout_active
     assert d_status.lockout_count >= 1
+
+  def _run_policy(self, DM, msgs):
+    levels, force_decel = [], []
+    for msg in msgs:
+      DM._update_states(msg, [0, 0, 0], 0, True, False)
+      DM._update_events(False, True, False, 0)
+      levels.append(DM.alert_level)
+      force_decel.append(DM.get_state_packet().driverMonitoringState.noResponseForceDecel)
+    return levels, force_decel
+
+  def test_disable_forced_disengage_keeps_alert_without_force_decel(self):
+    stock_levels, stock_decel = self._run_policy(DriverMonitoring(), always_distracted)
+    levels, decel = self._run_policy(DriverMonitoring(disable_forced_disengage=True), always_distracted)
+    assert stock_levels[int(DISTRACTED_SECONDS_TO_RED / DT_DMON)] == 3
+    assert any(stock_decel)
+    assert 3 in levels
+    assert not any(decel)
+
+  def test_disable_timeout_never_locks_out(self):
+    DM = DriverMonitoring(disable_timeout=True)
+    starting_count = DM.lockout_count
+    levels, _ = self._run_policy(DM, always_distracted)
+    assert levels[int(DISTRACTED_SECONDS_TO_RED / DT_DMON)] == 3
+    assert not DM.lockout_active
+    assert DM.lockout_count == starting_count
+    assert not DM.get_state_packet().driverMonitoringState.lockout
+
+  def test_disable_timeout_ignores_persisted_lockout(self):
+    Params().put_bool("DriverTooDistracted", True, block=True)
+    self.addCleanup(Params().remove, "DriverTooDistracted")
+    assert DriverMonitoring().lockout_active
+    assert not DriverMonitoring(disable_timeout=True).lockout_active
 
   # engaged, no face detected the whole time, no action
   def test_fully_invisible_driver(self):
