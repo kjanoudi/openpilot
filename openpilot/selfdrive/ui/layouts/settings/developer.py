@@ -35,11 +35,11 @@ DESCRIPTIONS = {
   ),
   'disable_forced': tr_noop(
     "Driver monitoring still shows its warnings, but it will not force deceleration or escalate to the car " +
-    "when the driver stays unresponsive. Applies after openpilot restarts."
+    "when the driver stays unresponsive. Applies next drive."
   ),
   'disable_timeout': tr_noop(
     "Removes the driver monitoring lockout that blocks engagement for 1 to 30 minutes after repeated " +
-    "distraction alerts. Applies after openpilot restarts."
+    "distraction alerts. Applies next drive."
   ),
   'cellular_disabled': tr_noop(
     "Hang up cellular data and don't redial. The modem stays registered and the SIM is untouched. " +
@@ -216,10 +216,14 @@ class DeveloperLayout(Widget):
     self._always_hold_toggle.action_item.set_state(self._params.get_bool(HOLD_KEY))
 
   def _on_disable_forced(self, state: bool):
-    self._params.put_bool("DisableDMForcedDisengage", state, block=True)
+    if ui_state.is_offroad():
+      self._params.put_bool("DisableDMForcedDisengage", state, block=True)
+    self._disable_forced_toggle.action_item.set_state(self._params.get_bool("DisableDMForcedDisengage"))
 
   def _on_disable_timeout(self, state: bool):
-    self._params.put_bool("DisableDMTimeout", state, block=True)
+    if ui_state.is_offroad():
+      self._params.put_bool("DisableDMTimeout", state, block=True)
+    self._disable_timeout_toggle.action_item.set_state(self._params.get_bool("DisableDMTimeout"))
 
   def _on_enable_ui_debug(self, state: bool):
     self._params.put_bool("ShowDebugInfo", state, block=True)

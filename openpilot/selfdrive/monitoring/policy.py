@@ -394,7 +394,7 @@ class DriverMonitoring:
     dat = messaging.new_message('driverMonitoringState', valid=valid)
     dm = dat.driverMonitoringState
 
-    dm.lockout = self.lockout_active and not self.disable_timeout
+    dm.lockout = self.lockout_active
     dm.lockoutCount = self.lockout_count
     if self.lockout_active:
       dm.lockoutMinutesRemaining = max(1, round((self.lockout_duration - self.lockout_time_elapsed) * DT_DMON / 60.))
